@@ -324,6 +324,7 @@
       const [editingName, setEditingName] = useState(false);
       const [dragIdx, setDragIdx] = useState(null);
       const [dragOverIdx, setDragOverIdx] = useState(null);
+      const importRef = useRef(null);
 
       const active = sequences.find(s => s.id === activeId) || sequences[0] || null;
 
@@ -371,6 +372,31 @@
       }
       function handleDragEnd() { setDragIdx(null); setDragOverIdx(null); }
 
+      function exportSequence(seq) {
+        const data = { name: seq.name, tools: seq.tools };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = seq.name.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.json';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      }
+
+      function importSequence(file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (!data.name || !Array.isArray(data.tools)) throw new Error('Invalid');
+            const validTools = data.tools.filter(id => TOOLS[id]);
+            createSequence(data.name, validTools);
+          } catch {
+            alert("Couldn't read that file — please make sure it's a Shaping Design sequence (.json).");
+          }
+        };
+        reader.readAsText(file);
+      }
+
       const pickerTools = Object.entries(TOOLS).filter(([id, tool]) =>
         !(active?.tools.includes(id)) && (modeFilter === 'All' || tool.mode === modeFilter)
       );
@@ -381,13 +407,22 @@
         <div style={{ display:'flex', height:'100%', minHeight:0 }}>
           {/* Sidebar */}
           <div style={{ width:220, flexShrink:0, background:'#fff', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
-            <div style={{ padding:'16px 12px 12px', borderBottom:'1px solid var(--border)' }}>
+            <div style={{ padding:'12px', borderBottom:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:6 }}>
               <button onClick={() => createSequence()}
                 style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:13, fontWeight:600, color:'var(--brand)', border:'1px dashed var(--brand)', borderRadius:'var(--radius)', padding:'8px', background:'var(--brand-light)', transition:'background 0.1s' }}
                 onMouseEnter={e => e.currentTarget.style.background='#cceefb'}
                 onMouseLeave={e => e.currentTarget.style.background='var(--brand-light)'}>
                 + New sequence
               </button>
+              <button onClick={() => importRef.current?.click()}
+                style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:12, fontWeight:500, color:'var(--text-muted)', border:'1px solid var(--border)', borderRadius:'var(--radius)', padding:'7px', background:'#fff', transition:'all 0.1s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor='var(--border-dark)'; e.currentTarget.style.color='var(--text)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--text-muted)'; }}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v9.2L5.4 7.6 4 9l4 4 4-4-1.4-1.4L8 10.2V1H8zM2 14v1h12v-1H2z"/></svg>
+                Import .json
+              </button>
+              <input ref={importRef} type="file" accept=".json" style={{ display:'none' }}
+                onChange={e => { if (e.target.files[0]) { importSequence(e.target.files[0]); e.target.value=''; } }} />
             </div>
             <div style={{ flex:1, overflowY:'auto', padding:'8px' }}>
               {sequences.length === 0 && (
@@ -398,17 +433,26 @@
                 return (
                   <div key={seq.id} style={{ position:'relative', marginBottom:2 }}>
                     <button onClick={() => { setActiveId(seq.id); setExpanded({}); }}
-                      style={{ width:'100%', textAlign:'left', padding:'8px 34px 8px 10px', borderRadius:6, fontSize:13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--brand)' : 'var(--text)', background: isActive ? 'var(--brand-light)' : 'transparent', transition:'background 0.1s', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}
+                      style={{ width:'100%', textAlign:'left', padding:'8px 52px 8px 10px', borderRadius:6, fontSize:13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--brand)' : 'var(--text)', background: isActive ? 'var(--brand-light)' : 'transparent', transition:'background 0.1s', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}
                       onMouseEnter={e => { if (!isActive) e.currentTarget.style.background='var(--surface-alt)'; }}
                       onMouseLeave={e => { if (!isActive) e.currentTarget.style.background='transparent'; }}>
                       {seq.name}
                       <div style={{ fontSize:11, color:'var(--text-light)', fontWeight:400 }}>{seq.tools.length} {seq.tools.length===1?'tool':'tools'}</div>
                     </button>
-                    <button onClick={() => deleteSequence(seq.id)}
-                      style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', color:'var(--text-light)', fontSize:16, padding:'2px 4px', borderRadius:4, lineHeight:1 }}
-                      onMouseEnter={e => e.currentTarget.style.color='#ef4444'}
-                      onMouseLeave={e => e.currentTarget.style.color='var(--text-light)'}
-                      title="Delete sequence">×</button>
+                    <div style={{ position:'absolute', right:4, top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center', gap:1 }}>
+                      <button onClick={e => { e.stopPropagation(); exportSequence(seq); }}
+                        style={{ color:'var(--text-light)', fontSize:13, padding:'3px 5px', borderRadius:4, lineHeight:1 }}
+                        onMouseEnter={e => e.currentTarget.style.color='var(--brand)'}
+                        onMouseLeave={e => e.currentTarget.style.color='var(--text-light)'}
+                        title="Export sequence as .json">
+                        <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-5-5 1.4-1.4L7 9.2V1h2v8.2l2.6-2.6L13 7l-5 5zM2 15v-1h12v1H2z"/></svg>
+                      </button>
+                      <button onClick={() => deleteSequence(seq.id)}
+                        style={{ color:'var(--text-light)', fontSize:16, padding:'2px 4px', borderRadius:4, lineHeight:1 }}
+                        onMouseEnter={e => e.currentTarget.style.color='#ef4444'}
+                        onMouseLeave={e => e.currentTarget.style.color='var(--text-light)'}
+                        title="Delete sequence">×</button>
+                    </div>
                   </div>
                 );
               })}
@@ -441,8 +485,18 @@
                       <span style={{ fontSize:12, fontWeight:400, color:'var(--text-light)', marginLeft:8 }}>(click to rename)</span>
                     </h2>
                   )}
-                  <div style={{ marginLeft:'auto', fontSize:12, color:'var(--text-muted)' }}>
-                    {active.tools.length} {active.tools.length===1?'tool':'tools'}
+                  <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:12, color:'var(--text-muted)' }}>
+                      {active.tools.length} {active.tools.length===1?'tool':'tools'}
+                    </span>
+                    <button onClick={() => exportSequence(active)}
+                      style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, fontWeight:500, color:'var(--text-muted)', border:'1px solid var(--border)', borderRadius:'var(--radius)', padding:'5px 10px', background:'#fff', transition:'all 0.1s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor='var(--brand)'; e.currentTarget.style.color='var(--brand)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--text-muted)'; }}
+                      title="Download sequence as .json">
+                      <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-5-5 1.4-1.4L7 9.2V1h2v8.2l2.6-2.6L13 7l-5 5zM2 15v-1h12v1H2z"/></svg>
+                      Save .json
+                    </button>
                   </div>
                 </div>
 
