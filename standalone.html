@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shaping Design — Sequence Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand: #009FE3; --brand-dark: #007bbf; --brand-light: #e6f6fd;
+      --bg: #f1f5f9; --surface: #ffffff; --surface-alt: #f8fafc;
+      --border: #e2e8f0; --border-dark: #cbd5e1;
+      --text: #1e293b; --text-muted: #64748b; --text-light: #94a3b8;
+      --radius: 8px; --radius-lg: 12px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+      --shadow: 0 1px 4px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+    }
+    html, body, #root { height: 100%; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg); color: var(--text); font-size: 14px;
+      line-height: 1.5; -webkit-font-smoothing: antialiased;
+    }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    input { font-family: inherit; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef } = React;
+
+    // ─── Data ────────────────────────────────────────────────────────────────
+    const IMAGE_BASE = 'https://raw.githubusercontent.com/resonantfutures/shaping-design-tools/main/';
+    const MODE_COLORS = {
+      Ground: '#64748b', Profile: '#0077B6', Prioritize: '#7C3AED',
+      Position: '#B45309', Envision: '#0F6E56', Plan: '#B91C1C',
+    };
+    const MODES = ['Ground','Profile','Prioritize','Position','Envision','Plan'];
+
+    const TOOLS = {
+      CT:  { name:'Career timeline',         mode:'Ground',     time:'20–30 min', desc:'Map your emotional curve against your career experiences', img:'CT_career-timeline.png',      steps:['Draw a timeline of your career from start to now','Mark emotional highs and lows','Note key events, roles, and turning points','Reflect on what drove the peaks and valleys'] },
+      TA:  { name:'Tools & activities',      mode:'Ground',     time:'10–15 min', desc:'Reflect on how you spend your time at work and how important it is', img:'TA_tools-activities.png',    steps:['List the key activities and tools in your current role','Rate how much time you spend on each','Rate how important each feels','Note gaps between time spent and importance'] },
+      CS:  { name:'Career snapshot',         mode:'Ground',     time:'10 min',    desc:'Summarize your career reflections so far', img:'CS_career-snapshot.png',     steps:['Review your other ground tools','Write a brief summary of your key learnings','Note your current strengths and open questions','Use as a reference point for further tools'] },
+      PD:  { name:'Perception deltas',       mode:'Ground',     time:'15–20 min', desc:'Explore differences between how you and others see you', img:'PD_perception-deltas.png',   steps:['Note how you see yourself across key dimensions','Estimate how others currently perceive you','Mark where you aspire to be','Reflect on the gaps and what they mean'] },
+      WL:  { name:'Wheel of life',           mode:'Ground',     time:'10 min',    desc:'Map how you feel about key areas of your life', img:'WL_wheel-of-life.png',       steps:["Review the life areas on the wheel","Rate your current satisfaction in each (0–5)","Identify areas you'd like to improve","Reflect on how work fits in with your wider life"] },
+      UP:  { name:'UX practice',             mode:'Profile',    time:'15–20 min', desc:'Map your competence in different fields of design practice', img:'UP_ux-practice.png',         steps:['Review the practice areas on the map','Rate your competence in each (0–5)','Mark areas you want to grow in with arrows','Reflect on your shape across the field'] },
+      SS:  { name:'Soft shapes',             mode:'Profile',    time:'10–15 min', desc:'Map competence across teamwork, soft skills and mindsets', img:'SS_soft-shapes.png',         steps:['Review the soft skill categories','Rate yourself in each out of 5','Add extra categories if relevant','Mark areas you want to improve'] },
+      FS:  { name:'Foundation skills',       mode:'Profile',    time:'10–15 min', desc:'Rate your competence in foundational technical and human skills', img:'FS_foundation-skills.png',   steps:['Review the foundation skill categories','Rate your competence in each (0–5)','Prioritize which you should improve','Mark how much you want to improve by'] },
+      OP:  { name:'Operational practices',   mode:'Profile',    time:'5–10 min',  desc:'Map competence across operational and management fields', img:'OP_operational-practices.png',steps:['Review the operational practice categories','Rate your competence in each (0–5)','Prioritize areas to improve','Mark growth aspirations with arrows'] },
+      LF:  { name:'Leadership functions',    mode:'Profile',    time:'15–20 min', desc:'Map effort, enjoyment and competence across design leadership areas', img:'LF_leadership-functions.png', steps:['Review the leadership function categories','Map your current competence in each','Map your enjoyment of each','Identify delta between where you are and want to be'] },
+      HQ:  { name:'Human qualities',         mode:'Prioritize', time:'15 min',    desc:'Prioritize personal values and behaviours', img:'HQ_human-qualities.png',     steps:['Review the human quality cards','Sort and prioritize the values most important to you','Identify your top 5–7','Reflect on how these show up in your work'] },
+      OQ:  { name:'Operational qualities',   mode:'Prioritize', time:'10–15 min', desc:'Prioritize the dominant qualities in how you think and communicate', img:'OQ_operational-qualities.png',steps:['Review the operational quality categories','Prioritize the qualities most dominant in you','Identify ones you want to develop','Note how they relate to your context'] },
+      VT:  { name:'Value targets',           mode:'Prioritize', time:'10–15 min', desc:'Distribute the value you offer across people and orgs you serve', img:'VT_value-targets.png',       steps:['Identify who you serve in your current or desired role','Allocate your value across these stakeholders','Reflect on the distribution','Consider how you want this to change'] },
+      VC:  { name:'Value classification',    mode:'Prioritize', time:'10–15 min', desc:'Identify the different types of value you offer to others', img:'VC_value-classification.png', steps:['Review the value types','Classify the value you currently offer','Identify new types of value you want to provide','Prioritize the most important to you'] },
+      UD:  { name:'UX dichotomies',          mode:'Position',   time:'10–15 min', desc:'Map your range and focus between different UX fields and mindsets', img:'UD_ux-dichotomies.png',      steps:['Review each dichotomy pair','Mark where you currently sit on each spectrum','Mark where you want to be','Reflect on the gaps'] },
+      DS:  { name:'Diamond stages',          mode:'Position',   time:'15 min',    desc:'Map where you and your organization focus design efforts', img:'DS_diamond-stages.png',      steps:['Review the diamond model','Mark where you personally focus most energy','Mark where your organization focuses','Reflect on alignment and gaps'] },
+      OV:  { name:'Operations value',        mode:'Position',   time:'10 min',    desc:'Prioritize what you value most across people, process, product and profit', img:'OV_operations-value.png',    steps:['Review the four value dimensions','Distribute your priority across them','Reflect on how your current role aligns','Consider how you want this to change'] },
+      ES:  { name:'Empathy spectrum',        mode:'Position',   time:'10 min',    desc:'Map your level of empathy for different stakeholders', img:'ES_empathy-spectrum.png',    steps:['List the key stakeholders in your world','Rate your empathy level for each','Reflect on any imbalances','Consider how you could develop empathy where needed'] },
+      LD:  { name:'Leadership dichotomies',  mode:'Position',   time:'10–15 min', desc:'Map your leadership ranges and comfort zones', img:'LD_leadership-dichotomies.png',steps:['Review each dichotomy pair','Mark your current range and centre of gravity','Add arrows to indicate desired shifts','Reflect on what changes you want to make'] },
+      LC:  { name:'Leaving card',            mode:'Envision',   time:'15–20 min', desc:'Envision a future self based on the perception of others', img:'LC_leaving-card.png',        steps:['Choose 3–4 people who matter to you professionally','Imagine you are leaving a role in the future','Write what each person would say about you','Reflect on the future self this describes'] },
+      CM:  { name:'Competence map',          mode:'Envision',   time:'20 min',    desc:'Develop your own competency map for areas you want to identify with', img:'CM_competence-map.png',      steps:['Draw on your earlier profiling tools','Choose competency areas you want to identify with in the future','Create your own map structure','Map your aspired future profile'] },
+      FF:  { name:'Four futures',            mode:'Envision',   time:'20–30 min', desc:'Explore four different trajectories for your future', img:'FF_four-futures.png',        steps:['Define four plausible future scenarios','Map what each would require','Rate each on desirability and feasibility','Use as input to your planning'] },
+      SSc: { name:'Solution scaling',        mode:'Envision',   time:'15 min',    desc:'Recognise the resources that help you make small steps towards your future', img:'SSc_solution-scaling.png',   steps:['Mark where you are now on a 0–10 scale','Describe the resources that got you this far','Identify small steps to move one point higher','Choose one to act on'] },
+      GC:  { name:'Growth cards',            mode:'Plan',       time:'15–20 min', desc:'Define areas to develop and how you will get there', img:'GC_growth-cards.png',        steps:['Review your envisioning outputs','Identify key areas where you need to grow','For each, define specific development actions','Prioritize by impact and feasibility'] },
+      FH:  { name:'Future horizons',         mode:'Plan',       time:'15 min',    desc:'Plan your development over multiple time horizons', img:'FH_future-horizons.png',      steps:['Define your immediate next steps (1 month)','Define medium-term steps (3–6 months)','Define longer-term aspirations (1–2 years)','Identify what needs to happen first'] },
+      YF:  { name:'Your forces',             mode:'Plan',       time:'15 min',    desc:'Externalize the tensions between drivers and barriers', img:'YF_your-forces.png',         steps:['List what is driving you towards your desired future','List what is holding you back','Reflect on how to amplify drivers','Reflect on how to reduce barriers'] },
+      JN:  { name:'Journal',                 mode:'Plan',       time:'Ongoing',   desc:'Track and reflect on your progress as you use the tools', img:null,                         steps:['After each tool, note your key learnings','Record what surprised you','Note questions that emerged','Return to review at regular intervals'] },
+      FJ:  { name:'Focus jar',              mode:'Plan',       time:'10 min',    desc:'Visualize your time and energy focus', img:'FJ_focus-jar.png',           steps:['Identify your main areas of focus','Allocate your time and energy across them','Reflect on the balance','Decide what to add, remove or protect'] },
+    };
+
+    const CONTEXTS = [
+      { code:'SO', title:'Starting out',          tagline:'Find the best opportunities',    voice:"I want to get an appreciation of the different aspects of UX design.",                                                     sequence:[{mode:'Profile',    tools:['UP','SS','FS']}],                                                                                                                       keyQuestions:['How can you get theoretical or practical exposure in each area?','Which activities connect most to what you believe in?','How much do you enjoy each of them?'] },
+      { code:'SW', title:'Switching to UX',        tagline:'Build on your previous career',  voice:"I want to find out which skills I already have that will help me in this new career.",                                    sequence:[{mode:'Ground',tools:['CT','TA','WL']},{mode:'Profile',tools:['UP','SS','FS']},{mode:'Prioritize',tools:['HQ','OQ']},{mode:'Position',tools:['UD']}],              keyQuestions:['How can you get exposure in each area?','Which activities connect to what you believe in?','How valuable is each area to your career?'] },
+      { code:'WD', title:'Working out direction',  tagline:'Choose the right path for you',  voice:"I want to clarify different directions I can take and reflect on what resonates with my desires.",                       sequence:[{mode:'Ground',tools:['CT','TA','WL','PD','CS']},{mode:'Profile',tools:['UP','SS','FS','LF']},{mode:'Prioritize',tools:['HQ','OQ']},{mode:'Position',tools:['UD','DS']},{mode:'Envision',tools:['LC','CM']},{mode:'Plan',tools:['GC','YF','FH']}], keyQuestions:['What has your impact been in the past?','What do you really want?','What is holding you back?'] },
+      { code:'NL', title:'New leader',             tagline:'Gain confidence in a new role',  voice:"I want to understand the different aspects of leadership and clarify what type of leader I want to be.",                 sequence:[{mode:'Ground',tools:['CT','TA']},{mode:'Profile',tools:['LF']},{mode:'Prioritize',tools:['HQ','OQ','VT']},{mode:'Position',tools:['OV','ES']},{mode:'Envision',tools:['LC','CM']},{mode:'Plan',tools:['GC','YF','FH']}], keyQuestions:['What kind of leadership shape is best for you?','How will you adapt your style?','Where can you seek support?'] },
+      { code:'LL', title:'Losing the love',        tagline:'Rediscover your passion',        voice:"I want to understand what brings me down and rediscover my passion to realign my career.",                               sequence:[{mode:'Ground',tools:['CT','TA','WL','PD','CS']},{mode:'Profile',tools:['UP','SS','LF']},{mode:'Prioritize',tools:['HQ','OQ','VT']},{mode:'Position',tools:['UD','DS','OV']},{mode:'Envision',tools:['LC']}], keyQuestions:['What do you really enjoy doing?','When were you at your best?','What is stopping you from doing that now?'] },
+      { code:'CR', title:'At a crossroads',        tagline:'Choose the right path for you',  voice:"I want to clarify different directions I could take and reflect on what resonates with my circumstances.",               sequence:[{mode:'Ground',tools:['CT','TA','WL']},{mode:'Profile',tools:['UP','LF']},{mode:'Prioritize',tools:['HQ','VT']},{mode:'Position',tools:['UD','DS']},{mode:'Envision',tools:['LC','CM']},{mode:'Plan',tools:['GC','YF','FH']}], keyQuestions:['What would you get from a change?','By saying yes to one route, what are you saying no to?','How permanent are the effects of that decision?'] },
+    ];
+
+    const CONTEXT_BG = ['#e0f2fe','#dbeafe','#ede9fe','#fef3c7','#dcfce7','#fce7f3'];
+    const STORAGE_KEY = 'shapingSequences';
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+    async function downloadImage(url, filename) {
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      } catch {
+        window.open(url, '_blank');
+      }
+    }
+
+    // ─── ToolCard ─────────────────────────────────────────────────────────────
+    function ImageSection({ url, filename, toolName }) {
+      const [loaded, setLoaded] = useState(false);
+      const [error, setError] = useState(false);
+      const [downloading, setDownloading] = useState(false);
+
+      async function handleDownload() {
+        setDownloading(true);
+        await downloadImage(url, filename);
+        setDownloading(false);
+      }
+
+      return (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:8 }}>Template preview</div>
+          <div style={{ background:'var(--bg)', borderRadius:'var(--radius)', overflow:'hidden', border:'1px solid var(--border)', minHeight: error ? 0 : 80, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {!error && (
+              <img src={url} alt={`${toolName} template`}
+                onLoad={() => setLoaded(true)} onError={() => setError(true)}
+                style={{ width:'100%', height:'auto', maxHeight:280, objectFit:'contain', display: loaded ? 'block' : 'none' }} />
+            )}
+            {!loaded && !error && <span style={{ fontSize:12, color:'var(--text-light)', padding:16 }}>Loading preview…</span>}
+            {error && <span style={{ fontSize:12, color:'var(--text-light)', padding:16 }}>Preview not available</span>}
+          </div>
+          {!error && (
+            <button onClick={handleDownload} disabled={downloading}
+              style={{ marginTop:10, display:'inline-flex', alignItems:'center', gap:6, fontSize:13, fontWeight:500, color:'var(--brand)', padding:'7px 14px', border:'1px solid var(--brand)', borderRadius:'var(--radius)', background:'#fff', opacity: downloading ? 0.6 : 1, transition:'background 0.1s' }}
+              onMouseEnter={e => e.currentTarget.style.background='var(--brand-light)'}
+              onMouseLeave={e => e.currentTarget.style.background='#fff'}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-5-5 1.4-1.4L7 9.2V1h2v8.2l2.6-2.6L13 7l-5 5zM2 15v-2h12v2H2z"/></svg>
+              {downloading ? 'Downloading…' : 'Download template'}
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    function ToolCard({ toolId, isExpanded, onToggle, showRemove, onRemove, dragging }) {
+      const tool = TOOLS[toolId];
+      if (!tool) return null;
+      const color = MODE_COLORS[tool.mode];
+      const imageUrl = tool.img ? IMAGE_BASE + tool.img : null;
+
+      return (
+        <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden', boxShadow: isExpanded ? 'var(--shadow-md)' : 'var(--shadow-sm)', opacity: dragging ? 0.4 : 1, transition:'opacity 0.1s, box-shadow 0.15s' }}>
+          <div onClick={onToggle} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', cursor:'pointer', userSelect:'none' }}>
+            {showRemove && (
+              <span style={{ color:'var(--text-light)', fontSize:18, cursor:'grab', padding:'2px 4px', flexShrink:0 }} title="Drag to reorder">⠿</span>
+            )}
+            <span style={{ width:10, height:10, borderRadius:'50%', background:color, flexShrink:0 }} />
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontWeight:600, fontSize:13 }}>{tool.name}</div>
+              {!isExpanded && <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{tool.desc}</div>}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+              <span style={{ fontSize:11, fontWeight:500, color, background:color+'18', padding:'2px 8px', borderRadius:20, whiteSpace:'nowrap' }}>{tool.mode}</span>
+              <span style={{ fontSize:11, color:'var(--text-muted)', whiteSpace:'nowrap' }}>{tool.time}</span>
+              {showRemove && (
+                <button onClick={e => { e.stopPropagation(); onRemove?.(); }}
+                  style={{ color:'var(--text-light)', fontSize:18, lineHeight:1, padding:'2px', borderRadius:4 }}
+                  onMouseEnter={e => e.currentTarget.style.color='#ef4444'}
+                  onMouseLeave={e => e.currentTarget.style.color='var(--text-light)'}
+                  title="Remove">×</button>
+              )}
+              <span style={{ color:'var(--text-muted)', fontSize:12, display:'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.2s', lineHeight:1 }}>▾</span>
+            </div>
+          </div>
+          {isExpanded && (
+            <div style={{ borderTop:'1px solid var(--border)', padding:'14px 14px 16px' }}>
+              <p style={{ fontSize:13, color:'var(--text-muted)', marginBottom:12 }}>{tool.desc}</p>
+              <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:8 }}>How to use it</div>
+              <ol style={{ paddingLeft:18, display:'flex', flexDirection:'column', gap:6 }}>
+                {tool.steps.map((s,i) => <li key={i} style={{ fontSize:13 }}>{s}</li>)}
+              </ol>
+              {imageUrl && <ImageSection url={imageUrl} filename={tool.img} toolName={tool.name} />}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─── GuidedTab ────────────────────────────────────────────────────────────
+    function ContextCard({ ctx, bg, toolCount, onClick }) {
+      const [hovered, setHovered] = useState(false);
+      return (
+        <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+          style={{ textAlign:'left', background:'#fff', border:`1px solid ${hovered ? 'var(--brand)' : 'var(--border)'}`, borderRadius:'var(--radius-lg)', padding:20, cursor:'pointer', boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)', transition:'all 0.15s', transform: hovered ? 'translateY(-1px)' : 'none' }}>
+          <div style={{ width:44, height:44, borderRadius:10, background:bg, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:14, fontSize:13, fontWeight:700, letterSpacing:'0.02em' }}>{ctx.code}</div>
+          <div style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>{ctx.title}</div>
+          <div style={{ fontSize:13, color:'var(--brand)', fontWeight:500, marginBottom:10 }}>{ctx.tagline}</div>
+          <div style={{ fontSize:12, color:'var(--text-muted)', lineHeight:1.5, marginBottom:14 }}>"{ctx.voice}"</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+            {ctx.sequence.map(({mode}) => (
+              <span key={mode} style={{ fontSize:10, fontWeight:500, color:MODE_COLORS[mode], background:MODE_COLORS[mode]+'18', padding:'2px 7px', borderRadius:20 }}>{mode}</span>
+            ))}
+          </div>
+          <div style={{ marginTop:14, paddingTop:12, borderTop:'1px solid var(--border)', fontSize:12, color:'var(--text-muted)', display:'flex', justifyContent:'space-between' }}>
+            <span>{toolCount} tools</span>
+            <span style={{ color:'var(--brand)', fontWeight:500 }}>View sequence →</span>
+          </div>
+        </button>
+      );
+    }
+
+    function ModeGroup({ mode, toolIds, expanded, onToggle }) {
+      const color = MODE_COLORS[mode];
+      return (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+            <div style={{ width:4, height:20, borderRadius:2, background:color, flexShrink:0 }} />
+            <span style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color }}>{mode}</span>
+            <span style={{ fontSize:12, color:'var(--text-light)' }}>{toolIds.length} {toolIds.length===1?'tool':'tools'}</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {toolIds.map(id => (
+              <ToolCard key={id} toolId={id} isExpanded={!!expanded[id]} onToggle={() => onToggle(id)} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function GuidedTab({ onAdapt }) {
+      const [selected, setSelected] = useState(null);
+      const [expanded, setExpanded] = useState({});
+
+      function toggleTool(id) { setExpanded(p => ({ ...p, [id]: !p[id] })); }
+
+      function handleAdapt() {
+        onAdapt(selected.title, selected.sequence.flatMap(g => g.tools));
+      }
+
+      if (selected) return (
+        <div style={{ maxWidth:760, margin:'0 auto' }}>
+          <button onClick={() => { setSelected(null); setExpanded({}); }}
+            style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:13, color:'var(--text-muted)', marginBottom:16, padding:'4px 0' }}
+            onMouseEnter={e => e.currentTarget.style.color='var(--text)'}
+            onMouseLeave={e => e.currentTarget.style.color='var(--text-muted)'}>
+            ← All contexts
+          </button>
+
+          <div style={{ background:'#fff', borderRadius:'var(--radius-lg)', padding:'20px 24px', border:'1px solid var(--border)', boxShadow:'var(--shadow-sm)', marginBottom:24 }}>
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--brand)', background:'var(--brand-light)', padding:'2px 8px', borderRadius:20, letterSpacing:'0.05em' }}>{selected.code}</span>
+                  <span style={{ fontSize:13, color:'var(--text-muted)' }}>{selected.tagline}</span>
+                </div>
+                <h2 style={{ fontSize:22, fontWeight:700, marginBottom:10 }}>{selected.title}</h2>
+                <p style={{ fontSize:14, color:'var(--text-muted)', fontStyle:'italic', lineHeight:1.6 }}>"{selected.voice}"</p>
+              </div>
+              <button onClick={handleAdapt}
+                style={{ flexShrink:0, display:'inline-flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600, color:'#fff', background:'var(--brand)', padding:'9px 16px', borderRadius:'var(--radius)', whiteSpace:'nowrap', transition:'background 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.background='var(--brand-dark)'}
+                onMouseLeave={e => e.currentTarget.style.background='var(--brand)'}>
+                Adapt this sequence →
+              </button>
+            </div>
+            <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid var(--border)' }}>
+              <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:8 }}>Key questions</div>
+              {selected.keyQuestions.map((q,i) => (
+                <div key={i} style={{ fontSize:13, color:'var(--text-muted)', display:'flex', gap:8, marginBottom:4 }}>
+                  <span style={{ color:'var(--brand)', fontWeight:600, flexShrink:0 }}>{i+1}.</span>{q}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+            {selected.sequence.map(({mode, tools}) => (
+              <ModeGroup key={mode} mode={mode} toolIds={tools} expanded={expanded} onToggle={toggleTool} />
+            ))}
+          </div>
+        </div>
+      );
+
+      return (
+        <div style={{ maxWidth:900, margin:'0 auto' }}>
+          <div style={{ marginBottom:24 }}>
+            <h2 style={{ fontSize:20, fontWeight:700, marginBottom:6 }}>Choose your context</h2>
+            <p style={{ fontSize:14, color:'var(--text-muted)' }}>Select the situation that best describes where you are right now. We'll recommend a sequence of tools to help you reflect and move forward.</p>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap:16 }}>
+            {CONTEXTS.map((ctx, i) => (
+              <ContextCard key={ctx.code} ctx={ctx} bg={CONTEXT_BG[i]}
+                toolCount={ctx.sequence.reduce((n,g) => n+g.tools.length, 0)}
+                onClick={() => { setSelected(ctx); setExpanded({}); }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ─── BuildTab ─────────────────────────────────────────────────────────────
+    function PickerTile({ toolId, tool, onAdd }) {
+      const [hovered, setHovered] = useState(false);
+      const color = MODE_COLORS[tool.mode];
+      return (
+        <button onClick={onAdd} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+          style={{ textAlign:'left', background: hovered ? color+'10' : '#fff', border:`1px solid ${hovered ? color : 'var(--border)'}`, borderRadius:'var(--radius)', padding:'10px 12px', cursor:'pointer', transition:'all 0.1s' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+            <span style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }} />
+            <span style={{ fontSize:12, fontWeight:600 }}>{tool.name}</span>
+          </div>
+          <div style={{ fontSize:11, color:'var(--text-muted)', lineHeight:1.4 }}>{tool.desc}</div>
+          <div style={{ marginTop:6, fontSize:11, color, fontWeight:500 }}>+ Add · {tool.time}</div>
+        </button>
+      );
+    }
+
+    function BuildTab({ sequences, setSequences }) {
+      const [activeId, setActiveId] = useState(null);
+      const [modeFilter, setModeFilter] = useState('All');
+      const [expanded, setExpanded] = useState({});
+      const [editingName, setEditingName] = useState(false);
+      const [dragIdx, setDragIdx] = useState(null);
+      const [dragOverIdx, setDragOverIdx] = useState(null);
+
+      const active = sequences.find(s => s.id === activeId) || sequences[0] || null;
+
+      function createSequence(name='New sequence', tools=[]) {
+        const id = Date.now().toString();
+        setSequences(p => [...p, { id, name, tools }]);
+        setActiveId(id);
+        setExpanded({});
+        setModeFilter('All');
+      }
+
+      function deleteSequence(id) {
+        setSequences(p => p.filter(s => s.id !== id));
+        if (active?.id === id) setActiveId(null);
+      }
+
+      function renameActive(name) {
+        if (!active) return;
+        setSequences(p => p.map(s => s.id === active.id ? { ...s, name } : s));
+      }
+
+      function toggleTool(toolId) {
+        if (!active) return;
+        const has = active.tools.includes(toolId);
+        const updated = has ? active.tools.filter(t => t !== toolId) : [...active.tools, toolId];
+        setSequences(p => p.map(s => s.id === active.id ? { ...s, tools: updated } : s));
+      }
+
+      function removeTool(toolId) {
+        if (!active) return;
+        setSequences(p => p.map(s => s.id === active.id ? { ...s, tools: s.tools.filter(t => t !== toolId) } : s));
+        setExpanded(p => { const n={...p}; delete n[toolId]; return n; });
+      }
+
+      function handleDragStart(e, i) { setDragIdx(i); e.dataTransfer.effectAllowed='move'; }
+      function handleDragOver(e, i) { e.preventDefault(); e.dataTransfer.dropEffect='move'; setDragOverIdx(i); }
+      function handleDrop(e, i) {
+        e.preventDefault();
+        if (dragIdx === null || dragIdx === i || !active) return;
+        const tools = [...active.tools];
+        const [moved] = tools.splice(dragIdx, 1);
+        tools.splice(i, 0, moved);
+        setSequences(p => p.map(s => s.id === active.id ? { ...s, tools } : s));
+        setDragIdx(null); setDragOverIdx(null);
+      }
+      function handleDragEnd() { setDragIdx(null); setDragOverIdx(null); }
+
+      const pickerTools = Object.entries(TOOLS).filter(([id, tool]) =>
+        !(active?.tools.includes(id)) && (modeFilter === 'All' || tool.mode === modeFilter)
+      );
+
+      const inSeq = new Set(active?.tools || []);
+
+      return (
+        <div style={{ display:'flex', height:'100%', minHeight:0 }}>
+          {/* Sidebar */}
+          <div style={{ width:220, flexShrink:0, background:'#fff', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+            <div style={{ padding:'16px 12px 12px', borderBottom:'1px solid var(--border)' }}>
+              <button onClick={() => createSequence()}
+                style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:13, fontWeight:600, color:'var(--brand)', border:'1px dashed var(--brand)', borderRadius:'var(--radius)', padding:'8px', background:'var(--brand-light)', transition:'background 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.background='#cceefb'}
+                onMouseLeave={e => e.currentTarget.style.background='var(--brand-light)'}>
+                + New sequence
+              </button>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'8px' }}>
+              {sequences.length === 0 && (
+                <div style={{ padding:'20px 8px', fontSize:12, color:'var(--text-light)', textAlign:'center', lineHeight:1.6 }}>Create your first sequence to get started.</div>
+              )}
+              {sequences.map(seq => {
+                const isActive = seq.id === active?.id;
+                return (
+                  <div key={seq.id} style={{ position:'relative', marginBottom:2 }}>
+                    <button onClick={() => { setActiveId(seq.id); setExpanded({}); }}
+                      style={{ width:'100%', textAlign:'left', padding:'8px 34px 8px 10px', borderRadius:6, fontSize:13, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--brand)' : 'var(--text)', background: isActive ? 'var(--brand-light)' : 'transparent', transition:'background 0.1s', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}
+                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background='var(--surface-alt)'; }}
+                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background='transparent'; }}>
+                      {seq.name}
+                      <div style={{ fontSize:11, color:'var(--text-light)', fontWeight:400 }}>{seq.tools.length} {seq.tools.length===1?'tool':'tools'}</div>
+                    </button>
+                    <button onClick={() => deleteSequence(seq.id)}
+                      style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', color:'var(--text-light)', fontSize:16, padding:'2px 4px', borderRadius:4, lineHeight:1 }}
+                      onMouseEnter={e => e.currentTarget.style.color='#ef4444'}
+                      onMouseLeave={e => e.currentTarget.style.color='var(--text-light)'}
+                      title="Delete sequence">×</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Main */}
+          <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+            {!active ? (
+              <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, color:'var(--text-muted)' }}>
+                <div style={{ fontSize:15, fontWeight:600, color:'var(--text)' }}>No sequence selected</div>
+                <div style={{ fontSize:13 }}>Create a new sequence or select one from the sidebar.</div>
+                <button onClick={() => createSequence()}
+                  style={{ marginTop:4, fontSize:13, fontWeight:600, color:'#fff', background:'var(--brand)', padding:'9px 18px', borderRadius:'var(--radius)' }}>
+                  + New sequence
+                </button>
+              </div>
+            ) : (
+              <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+                {/* Header */}
+                <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', background:'#fff', display:'flex', alignItems:'center', gap:12 }}>
+                  {editingName ? (
+                    <input autoFocus defaultValue={active.name}
+                      onBlur={e => { renameActive(e.target.value || active.name); setEditingName(false); }}
+                      onKeyDown={e => { if (e.key==='Enter') { renameActive(e.target.value || active.name); setEditingName(false); } if (e.key==='Escape') setEditingName(false); }}
+                      style={{ fontSize:18, fontWeight:700, border:'none', borderBottom:'2px solid var(--brand)', outline:'none', background:'transparent', width:260, padding:'2px 0' }} />
+                  ) : (
+                    <h2 onClick={() => setEditingName(true)} style={{ fontSize:18, fontWeight:700, cursor:'text' }} title="Click to rename">
+                      {active.name}
+                      <span style={{ fontSize:12, fontWeight:400, color:'var(--text-light)', marginLeft:8 }}>(click to rename)</span>
+                    </h2>
+                  )}
+                  <div style={{ marginLeft:'auto', fontSize:12, color:'var(--text-muted)' }}>
+                    {active.tools.length} {active.tools.length===1?'tool':'tools'}
+                  </div>
+                </div>
+
+                {/* Scrollable body */}
+                <div style={{ flex:1, overflowY:'auto', padding:'16px 20px', display:'flex', flexDirection:'column', gap:16 }}>
+                  {/* Sequence list */}
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:8 }}>Sequence</div>
+                    {active.tools.length === 0 ? (
+                      <div style={{ padding:24, textAlign:'center', fontSize:13, color:'var(--text-light)', background:'#fff', border:'1px dashed var(--border-dark)', borderRadius:'var(--radius)' }}>
+                        Add tools from the picker below to build your sequence.
+                      </div>
+                    ) : (
+                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                        {active.tools.map((toolId, idx) => (
+                          <div key={toolId} draggable
+                            onDragStart={e => handleDragStart(e, idx)}
+                            onDragOver={e => handleDragOver(e, idx)}
+                            onDrop={e => handleDrop(e, idx)}
+                            onDragEnd={handleDragEnd}
+                            style={{ outline: dragOverIdx===idx && dragIdx!==idx ? '2px solid var(--brand)' : 'none', borderRadius:'var(--radius)', transition:'opacity 0.1s' }}>
+                            <ToolCard toolId={toolId} isExpanded={!!expanded[toolId]}
+                              onToggle={() => setExpanded(p => ({...p, [toolId]: !p[toolId]}))}
+                              showRemove onRemove={() => removeTool(toolId)}
+                              dragging={dragIdx === idx} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tool picker */}
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:10 }}>Add tools</div>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
+                      {['All', ...MODES].map(m => (
+                        <button key={m} onClick={() => setModeFilter(m)}
+                          style={{ fontSize:12, fontWeight:500, padding:'4px 12px', borderRadius:20, border:'1px solid', borderColor: modeFilter===m ? (m==='All' ? 'var(--brand)' : MODE_COLORS[m]) : 'var(--border)', color: modeFilter===m ? (m==='All' ? 'var(--brand)' : MODE_COLORS[m]) : 'var(--text-muted)', background: modeFilter===m ? (m==='All' ? 'var(--brand-light)' : MODE_COLORS[m]+'15') : '#fff', transition:'all 0.1s' }}>
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                    {pickerTools.length === 0 ? (
+                      <div style={{ fontSize:13, color:'var(--text-light)', padding:'12px 0' }}>
+                        {modeFilter==='All' ? 'All tools are already in this sequence.' : `All ${modeFilter} tools are already in this sequence.`}
+                      </div>
+                    ) : (
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:8 }}>
+                        {pickerTools.map(([id, tool]) => (
+                          <PickerTile key={id} toolId={id} tool={tool} onAdd={() => toggleTool(id)} />
+                        ))}
+                      </div>
+                    )}
+
+                    {inSeq.size > 0 && (
+                      <div style={{ marginTop:16 }}>
+                        <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:8 }}>In this sequence</div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                          {[...inSeq].map(id => {
+                            const tool = TOOLS[id];
+                            if (!tool) return null;
+                            const c = MODE_COLORS[tool.mode];
+                            return (
+                              <span key={id} style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, color:c, background:c+'15', border:`1px solid ${c}40`, padding:'3px 8px 3px 6px', borderRadius:20 }}>
+                                <span style={{ width:6, height:6, borderRadius:'50%', background:c, flexShrink:0 }} />
+                                {tool.name}
+                                <button onClick={() => removeTool(id)} style={{ color:'inherit', opacity:0.6, fontSize:14, lineHeight:1 }}
+                                  onMouseEnter={e => e.currentTarget.style.opacity='1'}
+                                  onMouseLeave={e => e.currentTarget.style.opacity='0.6'}>×</button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ─── App ──────────────────────────────────────────────────────────────────
+    function App() {
+      const [tab, setTab] = useState('guided');
+      const [sequences, setSequences] = useState(() => {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+      });
+
+      useEffect(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sequences));
+      }, [sequences]);
+
+      function handleAdapt(name, toolIds) {
+        const id = Date.now().toString();
+        setSequences(p => [...p, { id, name, tools: toolIds }]);
+        setTab('build');
+      }
+
+      return (
+        <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
+          {/* Header */}
+          <header style={{ background:'#fff', borderBottom:'1px solid var(--border)', padding:'0 24px', display:'flex', alignItems:'center', height:56, flexShrink:0, gap:24, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ width:28, height:28, borderRadius:6, background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.8"/>
+                  <path d="M4 8h8M8 4v8" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, lineHeight:1.2 }}>Shaping Design</div>
+                <div style={{ fontSize:11, color:'var(--text-muted)', lineHeight:1.2 }}>Sequence Builder</div>
+              </div>
+            </div>
+
+            <nav style={{ display:'flex', gap:2, marginLeft:'auto' }}>
+              {[{id:'guided',label:'Guided by context'},{id:'build',label:'Build your own'}].map(({id,label}) => (
+                <button key={id} onClick={() => setTab(id)}
+                  style={{ fontSize:13, fontWeight: tab===id ? 600 : 400, color: tab===id ? 'var(--brand)' : 'var(--text-muted)', padding:'6px 16px', borderRadius:6, background: tab===id ? 'var(--brand-light)' : 'transparent', transition:'all 0.1s' }}
+                  onMouseEnter={e => { if (tab!==id) e.currentTarget.style.background='var(--surface-alt)'; }}
+                  onMouseLeave={e => { if (tab!==id) e.currentTarget.style.background='transparent'; }}>
+                  {label}
+                  {id==='build' && sequences.length > 0 && (
+                    <span style={{ marginLeft:6, fontSize:10, fontWeight:700, color:'#fff', background:'var(--brand)', padding:'1px 6px', borderRadius:10, verticalAlign:'middle' }}>{sequences.length}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </header>
+
+          {/* Content */}
+          <main style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+            {tab === 'guided' ? (
+              <div style={{ flex:1, overflowY:'auto', padding:24 }}>
+                <GuidedTab onAdapt={handleAdapt} />
+              </div>
+            ) : (
+              <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+                <BuildTab sequences={sequences} setSequences={setSequences} />
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    // ─── Mount ────────────────────────────────────────────────────────────────
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
