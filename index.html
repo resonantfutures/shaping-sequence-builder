@@ -229,9 +229,237 @@
       );
     }
 
+    // ─── openPrintPack (top-level so both tabs can use it) ───────────────────
+    function openPrintPack(seq) {
+      const ctx = CONTEXTS.find(c => c.title === seq.name);
+      const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const modeGroups = MODES.map(m => ({ mode:m, tools:seq.tools.filter(id=>TOOLS[id]?.mode===m) })).filter(g=>g.tools.length>0);
+      const thumbCols = seq.tools.length <= 8 ? 4 : 5;
+
+      const coverHtml = `<div class="page cover">
+        <div class="cover-eyebrow">Shaping Design</div>
+        <div class="cover-pre">Sequence Pack</div>
+        <div class="cover-title">for ${esc(seq.name)}</div>
+        <div class="cover-meta">
+          <span>${seq.tools.length} tools</span>
+          ${modeGroups.map(g=>`<span class="cover-pill">${esc(g.mode)}</span>`).join('')}
+        </div>
+      </div>`;
+
+      const thumbsHtml = seq.tools.map(id => {
+        const t = TOOLS[id]; if (!t) return '';
+        const c = MODE_COLORS[t.mode];
+        return `<div class="thumb">
+          <div class="thumb-img">${t.img?`<img src="${IMAGE_BASE}${t.img}" />`:`<div class="thumb-blank" style="border-color:${c}30"></div>`}</div>
+          <div class="thumb-name" style="color:${c}">${esc(t.name)}</div>
+        </div>`;
+      }).join('');
+
+      const overviewHtml = `<div class="page overview">
+        <div class="ov-left">
+          <div class="section-label">Sequence overview</div>
+          <h1 class="ov-title">${esc(seq.name)}</h1>
+          ${ctx?`<p class="ov-voice">"${esc(ctx.voice)}"</p>`:''}
+          ${ctx&&ctx.keyQuestions?`<div class="ov-qs"><div class="section-label">Key questions</div>${ctx.keyQuestions.map((q,i)=>`<div class="ov-q"><span class="q-n">${i+1}.</span>${esc(q)}</div>`).join('')}</div>`:''}
+          <div class="ov-modes">
+            ${modeGroups.map(g=>`<div class="mode-row"><span class="mode-dot" style="background:${MODE_COLORS[g.mode]}"></span><span class="mode-lbl" style="color:${MODE_COLORS[g.mode]}">${g.mode}</span><span class="mode-tools">${g.tools.map(id=>esc(TOOLS[id]?.name||'')).join(', ')}</span></div>`).join('')}
+          </div>
+        </div>
+        <div class="ov-right">
+          <div class="section-label">Tools in this pack (${seq.tools.length})</div>
+          <div class="thumb-grid" style="grid-template-columns:repeat(${thumbCols},1fr)">${thumbsHtml}</div>
+        </div>
+      </div>`;
+
+      const instrPages = seq.tools.map(id => {
+        const t = TOOLS[id]; if (!t) return '';
+        const c = MODE_COLORS[t.mode];
+        return `<div class="page instr">
+          <div class="instr-bar" style="background:${c}"></div>
+          <div class="instr-left">
+            <div class="instr-top">
+              <span class="mode-pill" style="color:${c};background:${c}15;border-color:${c}40">${esc(t.mode)}</span>
+              <span class="instr-time">${esc(t.time)}</span>
+            </div>
+            <h2 class="instr-name">${esc(t.name)}</h2>
+            <p class="instr-desc">${esc(t.desc)}</p>
+            <div class="section-label" style="margin-top:8mm">How to use it</div>
+            <ol class="instr-steps">${t.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
+          </div>
+          <div class="instr-right">
+            ${t.img?`<img class="instr-img" src="${IMAGE_BASE}${t.img}" />`:`<div class="instr-noimg">No template</div>`}
+          </div>
+        </div>`;
+      }).join('');
+
+      const tmplPages = seq.tools.map(id => {
+        const t = TOOLS[id]; if (!t||!t.img) return '';
+        const c = MODE_COLORS[t.mode];
+        return `<div class="page tmpl">
+          <div class="tmpl-hdr" style="border-top-color:${c}">
+            <span class="tmpl-mode" style="color:${c}">${esc(t.mode)}</span>
+            <span class="tmpl-name">${esc(t.name)}</span>
+          </div>
+          <div class="tmpl-body"><img src="${IMAGE_BASE}${t.img}" /></div>
+        </div>`;
+      }).join('');
+
+      const css = `
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Inter',system-ui,sans-serif;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        @page{size:A4 landscape;margin:0}
+        .page{width:297mm;height:210mm;overflow:hidden;position:relative;page-break-after:always}
+        .page:last-child{page-break-after:avoid}
+        .section-label{font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-bottom:3mm}
+        .cover{background:#009FE3;padding:20mm 24mm;display:flex;flex-direction:column;justify-content:flex-end;gap:2mm}
+        .cover-eyebrow{font-size:11pt;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em}
+        .cover-pre{font-size:13pt;font-weight:500;color:rgba(255,255,255,.85)}
+        .cover-title{font-size:34pt;font-weight:700;color:#fff;line-height:1.1;margin-bottom:6mm}
+        .cover-meta{display:flex;align-items:center;gap:5mm;font-size:10pt;color:rgba(255,255,255,.75)}
+        .cover-pill{background:rgba(255,255,255,.2);color:#fff;padding:1mm 3.5mm;border-radius:20pt;font-size:9pt;font-weight:500}
+        .overview{display:grid;grid-template-columns:1fr 1fr}
+        .ov-left{padding:14mm 11mm 14mm 18mm;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden}
+        .ov-right{padding:14mm 18mm 14mm 11mm;overflow:hidden}
+        .ov-title{font-size:20pt;font-weight:700;color:#1e293b;margin-bottom:4mm;line-height:1.2}
+        .ov-voice{font-size:9pt;color:#64748b;font-style:italic;line-height:1.6;margin-bottom:5mm;padding-left:3mm;border-left:3px solid #009FE3}
+        .ov-qs{margin-bottom:5mm}
+        .ov-q{font-size:8.5pt;color:#475569;display:flex;gap:2mm;margin-bottom:1.5mm;line-height:1.4}
+        .q-n{color:#009FE3;font-weight:600;flex-shrink:0}
+        .ov-modes{display:flex;flex-direction:column;gap:2mm;margin-top:auto}
+        .mode-row{display:flex;align-items:baseline;gap:2mm;overflow:hidden}
+        .mode-dot{width:2mm;height:2mm;border-radius:50%;flex-shrink:0;display:inline-block;position:relative;top:.5mm}
+        .mode-lbl{font-size:8pt;font-weight:700;flex-shrink:0;white-space:nowrap}
+        .mode-tools{font-size:7.5pt;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .thumb-grid{display:grid;gap:2.5mm;margin-top:2mm}
+        .thumb{display:flex;flex-direction:column;gap:1mm}
+        .thumb-img{width:100%;aspect-ratio:4/3;border-radius:1.5mm;overflow:hidden;background:#f8fafc;border:.5px solid #e2e8f0}
+        .thumb-img img{width:100%;height:100%;object-fit:cover}
+        .thumb-blank{width:100%;height:100%;border:1px dashed}
+        .thumb-name{font-size:6pt;color:#64748b;font-weight:500;line-height:1.3}
+        .instr{display:grid;grid-template-columns:1fr 1fr}
+        .instr-bar{position:absolute;left:0;top:0;bottom:0;width:3mm}
+        .instr-left{padding:14mm 11mm 14mm 20mm;display:flex;flex-direction:column;overflow:hidden}
+        .instr-right{background:#f8fafc;display:flex;align-items:center;justify-content:center;padding:10mm;border-left:1px solid #e2e8f0;overflow:hidden}
+        .instr-top{display:flex;align-items:center;gap:4mm;margin-bottom:4mm}
+        .mode-pill{font-size:8pt;font-weight:600;padding:1mm 3mm;border-radius:20pt;border:1px solid}
+        .instr-time{font-size:9pt;color:#64748b}
+        .instr-name{font-size:22pt;font-weight:700;color:#1e293b;line-height:1.15;margin-bottom:3mm}
+        .instr-desc{font-size:9pt;color:#64748b;line-height:1.6}
+        .instr-steps{padding-left:5mm;display:flex;flex-direction:column;gap:2.5mm}
+        .instr-steps li{font-size:10pt;color:#334155;line-height:1.5}
+        .instr-img{max-width:100%;max-height:165mm;object-fit:contain;border-radius:2mm;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+        .instr-noimg{font-size:9pt;color:#94a3b8;font-style:italic}
+        .tmpl{display:flex;flex-direction:column}
+        .tmpl-hdr{padding:3mm 8mm;border-top:3px solid;display:flex;align-items:center;gap:4mm}
+        .tmpl-mode{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+        .tmpl-name{font-size:9pt;color:#475569;font-weight:500}
+        .tmpl-body{flex:1;display:flex;align-items:center;justify-content:center;padding:4mm 8mm 7mm;overflow:hidden}
+        .tmpl-body img{max-width:100%;max-height:100%;object-fit:contain}
+      `;
+
+      const html = `<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8">
+  <title>Shaping Design — ${esc(seq.name)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>${css}</style>
+</head>
+<body>
+  ${coverHtml}${overviewHtml}${instrPages}${tmplPages}
+  <script>
+    (function(){
+      var imgs=Array.from(document.querySelectorAll('img')),loaded=0;
+      function tryPrint(){if(++loaded>=imgs.length)setTimeout(function(){window.print()},600);}
+      if(!imgs.length){setTimeout(function(){window.print()},400);}
+      else imgs.forEach(function(img){
+        if(img.complete&&img.naturalWidth>0)tryPrint();
+        else{img.onload=tryPrint;img.onerror=tryPrint;}
+      });
+    })();
+  <\/script>
+</body></html>`;
+
+      const w = window.open('','_blank','width=1200,height=900');
+      if (!w) { alert('Please allow popups for this page to generate the print pack.'); return; }
+      w.document.write(html);
+      w.document.close();
+    }
+
+    function GuidedThumbCard({ toolId, onClick }) {
+      const tool = TOOLS[toolId];
+      if (!tool) return null;
+      const color = MODE_COLORS[tool.mode];
+      const [hovered, setHovered] = useState(false);
+      return (
+        <div onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+          style={{ background:'#fff', border:`1px solid ${hovered ? color : 'var(--border)'}`, borderRadius:10, overflow:'hidden', cursor:'pointer', boxShadow: hovered ? 'var(--shadow-md)' : 'var(--shadow-sm)', transition:'all 0.15s', display:'flex', flexDirection:'column' }}>
+          <div style={{ background:'var(--bg)', aspectRatio:'4/3', overflow:'hidden', position:'relative' }}>
+            {tool.img
+              ? <img src={IMAGE_BASE + tool.img} alt={tool.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <span style={{ fontSize:11, color:'var(--text-light)' }}>No template</span>
+                </div>
+            }
+            {hovered && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.08)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <span style={{ background:'rgba(0,0,0,0.55)', color:'#fff', fontSize:11, fontWeight:600, padding:'4px 10px', borderRadius:20 }}>View details</span>
+            </div>}
+          </div>
+          <div style={{ padding:'10px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+              <span style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }} />
+              <span style={{ fontSize:10, fontWeight:600, color }}>{tool.mode}</span>
+              <span style={{ fontSize:10, color:'var(--text-light)', marginLeft:'auto', whiteSpace:'nowrap' }}>{tool.time}</span>
+            </div>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', lineHeight:1.3, marginBottom:3 }}>{tool.name}</div>
+            <div style={{ fontSize:11, color:'var(--text-muted)', lineHeight:1.45 }}>{tool.desc}</div>
+          </div>
+        </div>
+      );
+    }
+
+    function ToolDetailModal({ toolId, onClose }) {
+      const tool = TOOLS[toolId];
+      if (!tool) return null;
+      const color = MODE_COLORS[tool.mode];
+      const imageUrl = tool.img ? IMAGE_BASE + tool.img : null;
+      return (
+        <div onClick={onClose}
+          style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.55)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background:'#fff', borderRadius:14, maxWidth:640, width:'100%', maxHeight:'88vh', overflow:'auto', boxShadow:'0 24px 64px rgba(0,0,0,0.28)' }}>
+            {/* Header */}
+            <div style={{ padding:'20px 24px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'flex-start', gap:12 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <span style={{ fontSize:11, fontWeight:600, color, background:color+'15', padding:'2px 8px', borderRadius:20 }}>{tool.mode}</span>
+                  <span style={{ fontSize:12, color:'var(--text-muted)' }}>{tool.time}</span>
+                </div>
+                <h2 style={{ fontSize:20, fontWeight:700, color:'var(--text)', marginBottom:6 }}>{tool.name}</h2>
+                <p style={{ fontSize:13, color:'var(--text-muted)', lineHeight:1.6 }}>{tool.desc}</p>
+              </div>
+              <button onClick={onClose} style={{ fontSize:22, color:'var(--text-light)', padding:'2px 6px', borderRadius:6, flexShrink:0, lineHeight:1 }}
+                onMouseEnter={e => e.currentTarget.style.color='var(--text)'}
+                onMouseLeave={e => e.currentTarget.style.color='var(--text-light)'}>×</button>
+            </div>
+            {/* Steps */}
+            <div style={{ padding:'16px 24px', borderBottom: imageUrl ? '1px solid var(--border)' : 'none' }}>
+              <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:10 }}>How to use it</div>
+              <ol style={{ paddingLeft:18, display:'flex', flexDirection:'column', gap:8 }}>
+                {tool.steps.map((s,i) => <li key={i} style={{ fontSize:13, color:'var(--text)', lineHeight:1.6 }}>{s}</li>)}
+              </ol>
+            </div>
+            {/* Image + Download */}
+            {imageUrl && <div style={{ padding:'0 24px 20px' }}><ImageSection url={imageUrl} filename={tool.img} toolName={tool.name} /></div>}
+          </div>
+        </div>
+      );
+    }
+
     function GuidedTab({ onAdapt }) {
       const [selected, setSelected] = useState(null);
       const [expanded, setExpanded] = useState({});
+      const [seqView, setSeqView] = useState('list');
+      const [modalTool, setModalTool] = useState(null);
 
       function toggleTool(id) { setExpanded(p => ({ ...p, [id]: !p[id] })); }
 
@@ -258,12 +486,21 @@
                 <h2 style={{ fontSize:22, fontWeight:700, marginBottom:10 }}>{selected.title}</h2>
                 <p style={{ fontSize:14, color:'var(--text-muted)', fontStyle:'italic', lineHeight:1.6 }}>"{selected.voice}"</p>
               </div>
-              <button onClick={handleAdapt}
-                style={{ flexShrink:0, display:'inline-flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600, color:'#fff', background:'var(--brand)', padding:'9px 16px', borderRadius:'var(--radius)', whiteSpace:'nowrap', transition:'background 0.1s' }}
-                onMouseEnter={e => e.currentTarget.style.background='var(--brand-dark)'}
-                onMouseLeave={e => e.currentTarget.style.background='var(--brand)'}>
-                Adapt this sequence →
-              </button>
+              <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                <button onClick={() => openPrintPack({ name: selected.title, tools: selected.sequence.flatMap(g => g.tools) })}
+                  style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600, color:'var(--brand)', background:'#fff', border:'1px solid var(--brand)', padding:'9px 14px', borderRadius:'var(--radius)', whiteSpace:'nowrap', transition:'all 0.1s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='var(--brand-light)'}
+                  onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h8v4h2v6h-2v2H4v-2H2V5h2V1zm1 1v3h6V2H5zm7 4H4v4h1v-1h6v1h1V6zm-2 2H6v1h4V8zM4 12v2h8v-2H4z"/></svg>
+                  Print Pack
+                </button>
+                <button onClick={handleAdapt}
+                  style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600, color:'#fff', background:'var(--brand)', padding:'9px 16px', borderRadius:'var(--radius)', whiteSpace:'nowrap', transition:'background 0.1s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='var(--brand-dark)'}
+                  onMouseLeave={e => e.currentTarget.style.background='var(--brand)'}>
+                  Adapt this sequence →
+                </button>
+              </div>
             </div>
             <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid var(--border)' }}>
               <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:8 }}>Key questions</div>
@@ -275,11 +512,36 @@
             </div>
           </div>
 
-          <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-            {selected.sequence.map(({mode, tools}) => (
-              <ModeGroup key={mode} mode={mode} toolIds={tools} expanded={expanded} onToggle={toggleTool} />
-            ))}
+          {/* View toggle */}
+          <div style={{ display:'flex', alignItems:'center', marginBottom:12 }}>
+            <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)' }}>
+              Tools in sequence
+            </div>
+            <div style={{ marginLeft:'auto', display:'flex', gap:2, background:'var(--bg)', borderRadius:6, padding:2 }}>
+              {[['list','☰','List view'],['grid','⊞','Thumbnail view']].map(([mode,icon,title]) => (
+                <button key={mode} onClick={() => setSeqView(mode)} title={title}
+                  style={{ width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, borderRadius:4, background: seqView===mode ? '#fff' : 'transparent', color: seqView===mode ? 'var(--brand)' : 'var(--text-light)', boxShadow: seqView===mode ? 'var(--shadow-sm)' : 'none', transition:'all 0.15s' }}>
+                  {icon}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {seqView === 'list' ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+              {selected.sequence.map(({mode, tools}) => (
+                <ModeGroup key={mode} mode={mode} toolIds={tools} expanded={expanded} onToggle={toggleTool} />
+              ))}
+            </div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:12 }}>
+              {selected.sequence.flatMap(g => g.tools).map(id => (
+                <GuidedThumbCard key={id} toolId={id} onClick={() => setModalTool(id)} />
+              ))}
+            </div>
+          )}
+
+          {modalTool && <ToolDetailModal toolId={modalTool} onClose={() => setModalTool(null)} />}
         </div>
       );
 
@@ -293,7 +555,7 @@
             {CONTEXTS.map((ctx, i) => (
               <ContextCard key={ctx.code} ctx={ctx} bg={CONTEXT_BG[i]}
                 toolCount={ctx.sequence.reduce((n,g) => n+g.tools.length, 0)}
-                onClick={() => { setSelected(ctx); setExpanded({}); }} />
+                onClick={() => { setSelected(ctx); setExpanded({}); setSeqView('list'); setModalTool(null); }} />
             ))}
           </div>
         </div>
@@ -322,6 +584,7 @@
       const [modeFilter, setModeFilter] = useState('All');
       const [expanded, setExpanded] = useState({});
       const [editingName, setEditingName] = useState(false);
+      const [viewMode, setViewMode] = useState('list');
       const [dragIdx, setDragIdx] = useState(null);
       const [dragOverIdx, setDragOverIdx] = useState(null);
       const importRef = useRef(null);
@@ -395,6 +658,169 @@
           }
         };
         reader.readAsText(file);
+      }
+
+      function openPrintPack(seq) {
+        const ctx = CONTEXTS.find(c => c.title === seq.name);
+        const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const modeGroups = MODES.map(m => ({ mode:m, tools:seq.tools.filter(id=>TOOLS[id]?.mode===m) })).filter(g=>g.tools.length>0);
+        const thumbCols = seq.tools.length <= 8 ? 4 : 5;
+
+        const coverHtml = `<div class="page cover">
+          <div class="cover-eyebrow">Shaping Design</div>
+          <div class="cover-pre">Sequence Pack</div>
+          <div class="cover-title">for ${esc(seq.name)}</div>
+          <div class="cover-meta">
+            <span>${seq.tools.length} tools</span>
+            ${modeGroups.map(g=>`<span class="cover-pill">${esc(g.mode)}</span>`).join('')}
+          </div>
+        </div>`;
+
+        const thumbsHtml = seq.tools.map(id => {
+          const t = TOOLS[id]; if (!t) return '';
+          const c = MODE_COLORS[t.mode];
+          return `<div class="thumb">
+            <div class="thumb-img">${t.img?`<img src="${IMAGE_BASE}${t.img}" />`:`<div class="thumb-blank" style="border-color:${c}30"></div>`}</div>
+            <div class="thumb-name" style="color:${c}">${esc(t.name)}</div>
+          </div>`;
+        }).join('');
+
+        const overviewHtml = `<div class="page overview">
+          <div class="ov-left">
+            <div class="section-label">Sequence overview</div>
+            <h1 class="ov-title">${esc(seq.name)}</h1>
+            ${ctx?`<p class="ov-voice">"${esc(ctx.voice)}"</p>`:''}
+            ${ctx&&ctx.keyQuestions?`<div class="ov-qs"><div class="section-label">Key questions</div>${ctx.keyQuestions.map((q,i)=>`<div class="ov-q"><span class="q-n">${i+1}.</span>${esc(q)}</div>`).join('')}</div>`:''}
+            <div class="ov-modes">
+              ${modeGroups.map(g=>`<div class="mode-row"><span class="mode-dot" style="background:${MODE_COLORS[g.mode]}"></span><span class="mode-lbl" style="color:${MODE_COLORS[g.mode]}">${g.mode}</span><span class="mode-tools">${g.tools.map(id=>esc(TOOLS[id]?.name||'')).join(', ')}</span></div>`).join('')}
+            </div>
+          </div>
+          <div class="ov-right">
+            <div class="section-label">Tools in this pack (${seq.tools.length})</div>
+            <div class="thumb-grid" style="grid-template-columns:repeat(${thumbCols},1fr)">${thumbsHtml}</div>
+          </div>
+        </div>`;
+
+        const instrPages = seq.tools.map(id => {
+          const t = TOOLS[id]; if (!t) return '';
+          const c = MODE_COLORS[t.mode];
+          return `<div class="page instr">
+            <div class="instr-bar" style="background:${c}"></div>
+            <div class="instr-left">
+              <div class="instr-top">
+                <span class="mode-pill" style="color:${c};background:${c}15;border-color:${c}40">${esc(t.mode)}</span>
+                <span class="instr-time">${esc(t.time)}</span>
+              </div>
+              <h2 class="instr-name">${esc(t.name)}</h2>
+              <p class="instr-desc">${esc(t.desc)}</p>
+              <div class="section-label" style="margin-top:8mm">How to use it</div>
+              <ol class="instr-steps">${t.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
+            </div>
+            <div class="instr-right">
+              ${t.img?`<img class="instr-img" src="${IMAGE_BASE}${t.img}" />`:`<div class="instr-noimg">No template</div>`}
+            </div>
+          </div>`;
+        }).join('');
+
+        const tmplPages = seq.tools.map(id => {
+          const t = TOOLS[id]; if (!t||!t.img) return '';
+          const c = MODE_COLORS[t.mode];
+          return `<div class="page tmpl">
+            <div class="tmpl-hdr" style="border-top-color:${c}">
+              <span class="tmpl-mode" style="color:${c}">${esc(t.mode)}</span>
+              <span class="tmpl-name">${esc(t.name)}</span>
+            </div>
+            <div class="tmpl-body"><img src="${IMAGE_BASE}${t.img}" /></div>
+          </div>`;
+        }).join('');
+
+        const css = `
+          *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+          body{font-family:'Inter',system-ui,sans-serif;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          @page{size:A4 landscape;margin:0}
+          .page{width:297mm;height:210mm;overflow:hidden;position:relative;page-break-after:always}
+          .page:last-child{page-break-after:avoid}
+          .section-label{font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-bottom:3mm}
+
+          /* Cover */
+          .cover{background:#009FE3;padding:20mm 24mm;display:flex;flex-direction:column;justify-content:flex-end;gap:2mm}
+          .cover-eyebrow{font-size:11pt;font-weight:600;color:rgba(255,255,255,.7);letter-spacing:.04em}
+          .cover-pre{font-size:13pt;font-weight:500;color:rgba(255,255,255,.85)}
+          .cover-title{font-size:34pt;font-weight:700;color:#fff;line-height:1.1;margin-bottom:6mm}
+          .cover-meta{display:flex;align-items:center;gap:5mm;font-size:10pt;color:rgba(255,255,255,.75)}
+          .cover-pill{background:rgba(255,255,255,.2);color:#fff;padding:1mm 3.5mm;border-radius:20pt;font-size:9pt;font-weight:500}
+
+          /* Overview */
+          .overview{display:grid;grid-template-columns:1fr 1fr}
+          .ov-left{padding:14mm 11mm 14mm 18mm;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden}
+          .ov-right{padding:14mm 18mm 14mm 11mm;overflow:hidden}
+          .ov-title{font-size:20pt;font-weight:700;color:#1e293b;margin-bottom:4mm;line-height:1.2}
+          .ov-voice{font-size:9pt;color:#64748b;font-style:italic;line-height:1.6;margin-bottom:5mm;padding-left:3mm;border-left:3px solid #009FE3}
+          .ov-qs{margin-bottom:5mm}
+          .ov-q{font-size:8.5pt;color:#475569;display:flex;gap:2mm;margin-bottom:1.5mm;line-height:1.4}
+          .q-n{color:#009FE3;font-weight:600;flex-shrink:0}
+          .ov-modes{display:flex;flex-direction:column;gap:2mm;margin-top:auto}
+          .mode-row{display:flex;align-items:baseline;gap:2mm;overflow:hidden}
+          .mode-dot{width:2mm;height:2mm;border-radius:50%;flex-shrink:0;display:inline-block;position:relative;top:.5mm}
+          .mode-lbl{font-size:8pt;font-weight:700;flex-shrink:0;white-space:nowrap}
+          .mode-tools{font-size:7.5pt;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .thumb-grid{display:grid;gap:2.5mm;margin-top:2mm}
+          .thumb{display:flex;flex-direction:column;gap:1mm}
+          .thumb-img{width:100%;aspect-ratio:4/3;border-radius:1.5mm;overflow:hidden;background:#f8fafc;border:.5px solid #e2e8f0}
+          .thumb-img img{width:100%;height:100%;object-fit:cover}
+          .thumb-blank{width:100%;height:100%;border:1px dashed}
+          .thumb-name{font-size:6pt;color:#64748b;font-weight:500;line-height:1.3}
+
+          /* Instruction */
+          .instr{display:grid;grid-template-columns:1fr 1fr}
+          .instr-bar{position:absolute;left:0;top:0;bottom:0;width:3mm}
+          .instr-left{padding:14mm 11mm 14mm 20mm;display:flex;flex-direction:column;overflow:hidden}
+          .instr-right{background:#f8fafc;display:flex;align-items:center;justify-content:center;padding:10mm;border-left:1px solid #e2e8f0;overflow:hidden}
+          .instr-top{display:flex;align-items:center;gap:4mm;margin-bottom:4mm}
+          .mode-pill{font-size:8pt;font-weight:600;padding:1mm 3mm;border-radius:20pt;border:1px solid}
+          .instr-time{font-size:9pt;color:#64748b}
+          .instr-name{font-size:22pt;font-weight:700;color:#1e293b;line-height:1.15;margin-bottom:3mm}
+          .instr-desc{font-size:9pt;color:#64748b;line-height:1.6}
+          .instr-steps{padding-left:5mm;display:flex;flex-direction:column;gap:2.5mm}
+          .instr-steps li{font-size:10pt;color:#334155;line-height:1.5}
+          .instr-img{max-width:100%;max-height:165mm;object-fit:contain;border-radius:2mm;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+          .instr-noimg{font-size:9pt;color:#94a3b8;font-style:italic}
+
+          /* Template */
+          .tmpl{display:flex;flex-direction:column}
+          .tmpl-hdr{padding:3mm 8mm;border-top:3px solid;display:flex;align-items:center;gap:4mm}
+          .tmpl-mode{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+          .tmpl-name{font-size:9pt;color:#475569;font-weight:500}
+          .tmpl-body{flex:1;display:flex;align-items:center;justify-content:center;padding:4mm 8mm 7mm;overflow:hidden}
+          .tmpl-body img{max-width:100%;max-height:100%;object-fit:contain}
+        `;
+
+        const html = `<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8">
+  <title>Shaping Design — ${esc(seq.name)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>${css}</style>
+</head>
+<body>
+  ${coverHtml}${overviewHtml}${instrPages}${tmplPages}
+  <script>
+    (function(){
+      var imgs=Array.from(document.querySelectorAll('img')),loaded=0;
+      function tryPrint(){if(++loaded>=imgs.length)setTimeout(function(){window.print()},600);}
+      if(!imgs.length){setTimeout(function(){window.print()},400);}
+      else imgs.forEach(function(img){
+        if(img.complete&&img.naturalWidth>0)tryPrint();
+        else{img.onload=tryPrint;img.onerror=tryPrint;}
+      });
+    })();
+  <\/script>
+</body></html>`;
+
+        const w = window.open('','_blank','width=1200,height=900');
+        if (!w) { alert('Please allow popups for this page to generate the print pack.'); return; }
+        w.document.write(html);
+        w.document.close();
       }
 
       const pickerTools = Object.entries(TOOLS).filter(([id, tool]) =>
@@ -497,6 +923,14 @@
                       <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-5-5 1.4-1.4L7 9.2V1h2v8.2l2.6-2.6L13 7l-5 5zM2 15v-1h12v1H2z"/></svg>
                       Save .json
                     </button>
+                    <button onClick={() => openPrintPack(active)}
+                      style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, fontWeight:600, color:'#fff', border:'1px solid var(--brand)', borderRadius:'var(--radius)', padding:'5px 12px', background:'var(--brand)', transition:'all 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.background='var(--brand-dark)'}
+                      onMouseLeave={e => e.currentTarget.style.background='var(--brand)'}
+                      title="Generate printable PDF pack for this sequence">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h8v4h2v6h-2v2H4v-2H2V5h2V1zm1 1v3h6V2H5zm7 4H4v4h1v-1h6v1h1V6zm-2 2H6v1h4V8zM4 12v2h8v-2H4z"/></svg>
+                      Print Pack
+                    </button>
                   </div>
                 </div>
 
@@ -504,12 +938,25 @@
                 <div style={{ flex:1, overflowY:'auto', padding:'16px 20px', display:'flex', flexDirection:'column', gap:16 }}>
                   {/* Sequence list */}
                   <div>
-                    <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)', marginBottom:8 }}>Sequence</div>
+                    <div style={{ display:'flex', alignItems:'center', marginBottom:10 }}>
+                      <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-light)' }}>Sequence</div>
+                      {active.tools.length > 0 && (
+                        <div style={{ marginLeft:'auto', display:'flex', gap:2, background:'var(--bg)', borderRadius:6, padding:2 }}>
+                          {[['list','☰'],['grid','⊞']].map(([mode, icon]) => (
+                            <button key={mode} onClick={() => setViewMode(mode)} title={mode === 'list' ? 'List view' : 'Thumbnail view'}
+                              style={{ width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, borderRadius:4, background: viewMode===mode ? '#fff' : 'transparent', color: viewMode===mode ? 'var(--brand)' : 'var(--text-light)', boxShadow: viewMode===mode ? 'var(--shadow-sm)' : 'none', transition:'all 0.15s' }}>
+                              {icon}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {active.tools.length === 0 ? (
                       <div style={{ padding:24, textAlign:'center', fontSize:13, color:'var(--text-light)', background:'#fff', border:'1px dashed var(--border-dark)', borderRadius:'var(--radius)' }}>
                         Add tools from the picker below to build your sequence.
                       </div>
-                    ) : (
+                    ) : viewMode === 'list' ? (
                       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                         {active.tools.map((toolId, idx) => (
                           <div key={toolId} draggable
@@ -524,6 +971,58 @@
                               dragging={dragIdx === idx} />
                           </div>
                         ))}
+                      </div>
+                    ) : (
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:12 }}>
+                        {active.tools.map((toolId, idx) => {
+                          const tool = TOOLS[toolId];
+                          if (!tool) return null;
+                          const color = MODE_COLORS[tool.mode];
+                          const imageUrl = tool.img ? IMAGE_BASE + tool.img : null;
+                          const isDragging = dragIdx === idx;
+                          const isOver = dragOverIdx === idx && dragIdx !== idx;
+                          return (
+                            <div key={toolId} draggable
+                              onDragStart={e => handleDragStart(e, idx)}
+                              onDragOver={e => handleDragOver(e, idx)}
+                              onDrop={e => handleDrop(e, idx)}
+                              onDragEnd={handleDragEnd}
+                              style={{ background:'#fff', border:`2px solid ${isOver ? 'var(--brand)' : 'var(--border)'}`, borderRadius:10, overflow:'hidden', display:'flex', flexDirection:'column', boxShadow: isDragging ? 'none' : 'var(--shadow-sm)', opacity: isDragging ? 0.35 : 1, cursor:'grab', transition:'opacity 0.1s, border-color 0.1s' }}>
+                              {/* Thumbnail */}
+                              <div style={{ background:'var(--bg)', aspectRatio:'4/3', overflow:'hidden', position:'relative' }}>
+                                {imageUrl
+                                  ? <img src={imageUrl} alt={tool.name} style={{ width:'100%', height:'100%', objectFit:'cover', pointerEvents:'none' }} />
+                                  : <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                      <span style={{ fontSize:11, color:'var(--text-light)' }}>No template</span>
+                                    </div>
+                                }
+                                {/* Order badge */}
+                                <div style={{ position:'absolute', top:6, left:6, width:20, height:20, borderRadius:'50%', background: isOver ? 'var(--brand)' : 'rgba(0,0,0,0.45)', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.1s' }}>
+                                  {idx + 1}
+                                </div>
+                                {/* Drag hint */}
+                                <div style={{ position:'absolute', top:6, right:32, background:'rgba(0,0,0,0.35)', borderRadius:4, padding:'2px 5px', fontSize:10, color:'#fff', opacity:0.6 }}>⠿</div>
+                                {/* Remove button */}
+                                <button onClick={e => { e.stopPropagation(); removeTool(toolId); }}
+                                  style={{ position:'absolute', top:4, right:4, width:22, height:22, borderRadius:'50%', background:'rgba(0,0,0,0.45)', color:'#fff', fontSize:14, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center', opacity:0.7 }}
+                                  onMouseEnter={e => e.currentTarget.style.opacity='1'}
+                                  onMouseLeave={e => e.currentTarget.style.opacity='0.7'}>
+                                  ×
+                                </button>
+                              </div>
+                              {/* Info */}
+                              <div style={{ padding:'10px' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                                  <span style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }} />
+                                  <span style={{ fontSize:10, fontWeight:600, color, letterSpacing:'0.03em' }}>{tool.mode}</span>
+                                  <span style={{ fontSize:10, color:'var(--text-light)', marginLeft:'auto' }}>{tool.time}</span>
+                                </div>
+                                <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', lineHeight:1.3, marginBottom:4 }}>{tool.name}</div>
+                                <div style={{ fontSize:11, color:'var(--text-muted)', lineHeight:1.5 }}>{tool.desc}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
